@@ -26,7 +26,7 @@ CheckCPU:
 	jne	.ok			; jesli rozne wyskocz, cpu spoko.
 	mov	ax,ERR_NO386
 	call	Error
-.ok	
+.ok:
 	pop	ebx
 	pop	eax
 	pop	si

@@ -12,6 +12,7 @@ BITS 16
 
 	%define	DEBUG	0
 
+    %define IDT_ADDR		0x700
 
 
 	%include 'core/memorymap.i'

@@ -1,4 +1,4 @@
-TOP = /root/nova/sources
+TOP = $(shell pwd)
 LIBTAIL = $(TOP)/libs/libtail.o
 
 export TOP

@@ -23,7 +23,7 @@ FindFileInRoot:
 	mov	es,bx
 	movzx	eax,word [root_dir_sec]
 	mov	cx,[root_sectors]
-.next	push	cx
+.next:	push	cx
 	push	es
 	push	eax
 %if DEBUG
@@ -64,7 +64,7 @@ FindFileInRoot:
 	pop	es
 	pop	cx
 	mov	ax,bx	
-.end
+.end:
 %if DEBUG
 	PrintM	sr5
 %endif

@@ -32,7 +32,7 @@ FindFileInDir:
 	jnc	.ok2
 	mov	ax,ERR_READERROR
 	call	Error
-.ok2
+.ok2:
 ;	call	_showbuffer
 ;	call	waitkey
 	
