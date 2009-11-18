@@ -26,11 +26,10 @@ Requirements:
 Compilation:
 ============
 
-    make core			- obj/novacore (skopiuj do /dev/fd0)
-    make exec 			- obj/libs/exec.lib (skopij do /dev/fd0/libs)
-	make boot			- obj/floppymbr (MasterBootRecord dla dyskietki)
-						  zainstaluj poprzez wywolanie "make installboot"
-						  (uwaga, w systemie musi byc obecne polecenie dd)    
+    make core
+    make exec
+    make boot
+
 
 Instalation:
 ============
