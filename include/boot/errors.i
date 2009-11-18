@@ -1,0 +1,8 @@
+	%define	ERR_CANTREADBB	0
+	%define	ERR_FATALERROR	1
+	%define	ERR_BADKERNEL	2
+	%define	ERR_NO386	3
+	%define	ERR_READERROR	4
+	%define	ERR_KERNELNOTFOUND	5
+	%define ERR_FILENOTFOUND 6
+

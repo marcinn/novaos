@@ -1,0 +1,10 @@
+20-12-2002
+==========
+
+Uwagi:
+
+1. Napisac bootstrap dla partycji HD.
+
+2. Zastanowic sie, czy nie moze to byc ten sam (lub bardzo podobny)
+   kod jak dla floppy mbr.
+   

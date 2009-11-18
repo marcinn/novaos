@@ -1,0 +1,16 @@
+20-12-2002
+==========
+
+Uwagi:
+
+1. Dorobic obsluge dysku twardego, tj:
+    - odczytac parametry dysku z BIOS'u
+    - obsluzyc FAT16/32
+
+LUB (najlepiej)
+
+2. Od razu przeskoczyc do trybu chronionego
+   i umiescic w "novaload" sterownik floppy i ide, zeby
+   nie truc ludzi instalacja systemu na partycji mieszczacej
+   sie ponizej 1024 cylindra... PC SUXX
+   tylko ze to jest czasochlonne i pracochlonne.

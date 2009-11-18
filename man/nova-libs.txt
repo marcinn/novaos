@@ -1,0 +1,145 @@
+
+I.	Biblioteki dzielone (shared libraries)
+
+1.	Wstep
+
+	Sa to programy wykonywalne zawierajace zestaw procedur, z ktorych
+moga korzystac tworcy oprogramowania w celu ulatwienia (przyspieszenia)
+pisania wlasnych programow (np. graphics.library zawiera procedury
+dotyczace operacji graficznych, tj. od ustawienia punktu na ekranie
+do zaawansowanych dwuwymiarowych operacji graficznych). Aby programy
+dzialaly prawidlowo w srodowisku, musza korzystac tylko i wylacznie
+ze znanych i zaakceptowanych (np. dolaczonych do systemu) bibliotek.
+Nie dozwolone jest bezposrednie modyfikowanie okien czy ekranow
+w jakikolwiek sposob pomimo faktu, iz jest to w praktyce mozliwe.
+Jednakze w takiej sytuacji tworcy systemu operacyjnego nie gwarantuja
+ani poprawnosci dzialania danego programu (lub wielu programow),
+ani stabilnosci samego systemu, zarowno w biezacej, jak i w kolejnych
+jego wersjach.
+
+	Idea bibliotek dzielonych polega na udostepnieniu potencjalnemu
+uzytkownikowi (programiscie) szerokiej gamy algorytmow. Biblioteki
+sa sklasyfikowane i podzielone na szereg niewielkich plikow ze wzgledu
+na gatunek wykonywanych przez nie operacji. W efekcie daje
+to elastycznosc w rozbudowywaniu systemu oraz pliki wykonywalne programow
+o stosunkowo niewielkich rozmiarach. Biblioteki dzielone wczytywane
+sa do pamieci przy pierwszym ich uzyciu. Inny program, chcacy korzystac
+z tej samej biblioteki, w rzeczywistosci nie laduje jej ponownie
+do pamieci. Dziala to rowniez w odwrotna strone - system usunie biblioteke
+z pamieci jedynie wtedy, gdy nie bedzie z niej juz korzystal zaden program
+(zadanie). W ten sposob uzyskano mniejsze zapotrzebowanie systemu na pamiec
+operacyjna komputera.
+
+	Biblioteki mozna swobodnie zastepowac ich nowszymi wersjami. Mozna je
+rowniez samodzielnie modyfikowac (dysponujac oczywiscie odpowiednimi zrodlami),
+jednakze prawo do modyfikacji bibliotek wchodzacych w sklad NovaOS ma
+jedynie NovaTeam, jako producent systemu. Lista zarezerwowanych
+bibliotek znajduje sie w Dodatku A niniejszego dokumentu. Rowniez w tym
+przypadku istnieje praktyczna mozliwosc modyfikacji plikow systemowych
+(chociazby przy uzyciu programow typu "resource"), jednakze NovaTeam
+nie bierze odpowiedzialnosci za skutki takich operacji, ani za stabilnosc
+srodowiska tak zmodyfikowanego. Programisci chcacy rozbudowywac
+biblioteki systemowe (patrz Dodatek A) powinni sie skontaktowac
+bezposrednio z producentem. Nie wyklucza sie mozliwosci wspolpracy
+na scisle okreslonych zasadach.
+
+2.	Budowa
+
+	Biblioteki dzielone tworzone sa w pewien scisle okreslony sposob,
+wedlug zasad, o ktorych bedzie szerzej mowa w tym rozdziale. Pomimo
+faktu, iz biblioteka jest po prostu zwyklym programem wykonywalnym, nie
+mozna jej uruchomic bezposrednio (w efekcie nic sie nie stanie). Zatem
+glowna funkcja biblioteki musi wygladac nastepujaco:
+
+int main() {
+	return (-1);		/* zwrocona wartosc to numer bledu */
+}
+
+	Kazda z procedur (funkcji) biblioteki musi byc zapoczatkowana i
+zakonczona za pomoca odpowiednich makr. Wynika to z faktu, iz procedury
+biblioteki przyjmuja argumenty w specyficzny sposob - niezalezny od
+zadnego kompilatora. Parametry przekazywane sa przez stos zadania wykonujacego
+sie w danym momencie (innymi slowy przez stos programu wywolujacego
+funkcje z biblioteki), w kolejnosci nastepujacej:
+
+ baza biblioteki (wskaznik na strukture Library), z ktorej korzysta program
+ parametr 1
+ parametr 2
+ ...
+ parametr n
+
+Dokladnie w odwrotnej kolejnosci odczytuje je procedura biblioteki. Dlatego
+tez nalezy korzystac z makr. Inny sposob bedzie oplakany w skutkach.
+Wybrano ten sposob, z uwagi na o wiele prostsze programowanie w
+jezykach niskiego poziomu, oraz ze wzgledu na ograniczona ilosc rejestrow
+ogolnego uzytku procesorow z rodziny Intel x86. Dzieki takiemu podejsciu
+mamy nadzieje, ze weterani programowania beda zadowoleni.
+
+Do deklaracji funkcji nalezy makro LIBFUNCx, gdzie x to ilosc parametrow (0-9),
+ktorych ta wymaga. Skladnia:
+
+	LIBFUNCx (	typ zwracanej wartosci, nazwa,
+			 	typ parametru 1, nazwa zmiennej parametru 1,
+				typ parametru 2, nazwa zmiennej parametry 2,
+				...,
+				typ parametru x, nazwa zmiennej parametru x,
+				definicja zmiennej bedacej wskaznikiem na baze biblioteki)
+				
+Przyklad:
+
+	LIBFUNC2(LONG, Dodaj, LONG, a, LONG, b, struct Library *MathBase)
+	
+Wskaznik na baze biblioteki umozliwia bibliotece zlokalizowanie struktury
+Library i jej ewentualna modyfikacje.
+Prosze zauwazyc, ze po postaci makra nie wystepuje znak ";".
+
+W dalszej czesci nastepuje zasadnicza tresc (cialo) procedury:
+
+{
+	return(a+b);
+}
+
+Procedure biblioteki nalezy zakonczyc makrem:
+
+LIBFUNCEND
+
+(rowniez bez srednika)
+
+Oto budowa pojedynczej funkcji biblioteki:
+
+	#include <nova/libdef.h>
+	LIBFUNC2(LONG, Dodaj, LONG, a, LONG, b, struct Library *MathBase)
+	{
+		return(a+b);
+	}
+	LIBFUNCEND
+	
+Kolejnym krokiem jest zbudownie tablicy offsetow funkcji i procedur.
+Ma ona postac nastepujaca (dla naszego przykladu):
+
+	const FUNCVEC math_functable[] = {
+		(FUNCVEC) &Dodaj,
+		(FUNCVEC) &Odejmij,
+		(FUNCVEC) &Pomnoz,
+		...
+
+Az do funkcji, ktore musza wystepowac w kazdej bibliotece
+i wypelniac odpowiednie zadania, tj:
+
+		(FUNCVEC) &LibExpunge,
+		(FUNCVEC) &LibClose,
+		(FUNCVEC) &LibOpen
+		};
+		
+W zrodle nalezy rowniez umiescic wypelniona odpowiednio strukture
+Resident, gdyz kazda biblioteka jest modulem rezydentnym. Sa to wazne
+dane dla samego systemu operacyjnego.
+
+		struct Resident mat_res= {
+				...
+		};
+
+Ostatnim krokiem jest wyznaczenie przesuniec wzgledem bazy biblioteki,
+ktore beda wskazywaly na instrukcje skoku do poszczegolnych funkcji/procedur
+biblioteki.
+

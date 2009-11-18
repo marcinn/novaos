@@ -1,0 +1,598 @@
+
+         .,;%!##########################!%; .-----, ;%!#############!%;,.
+             .___, .___.______ .____.____  /      |
+             /   \/   1  __   ]|    /   / /  ,--. |     
+       []   /      .-=  (__)  [|   !.  / /  (___! |  []
+          .(___/\___/.________|~      /./____/____|,========-,.
+         new operating system ,|_____/.     --------------
+                                        devel0peD bY M@rc!n NoWaK
+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+2003-03-02:
+
+	1.	W pkt.3 z poprzedniego dnia sklamalem. Wszystko dziala jak nalezy.
+		Problem polegal na tym, ze nie odbieralem znakow generowanych
+		przez handler! (kgetc() To jak to mialo pisac po ekranie ;)
+		Jestesmy kroczek do przodu.
+
+	2.	Ok. SysBase wzbogacilo sie o listy przerwan (0-255)
+		Server przerwan korzysta z tych list i w zaleznosci od numeru
+		przerwania sprawdza, czy lista zawiera jakies handlery.
+		
+	3.	Handlery dodaje sie przez:
+		AddTail(&SysBase->Interrupts[numer], Handler);
+		
+		Handler to wskaznik na strukture Handler:
+		{
+			struct Node hnd_Node;
+			APTR		hnd_FuncPtr;	// <- wskaznik do ciala handlera
+		};
+		
+		Problem: czy zostawic strukture Handler, czy skorzystac z innej
+		juz istniejacej? Czym jest handler? Modulem rezydentnym napewno.
+		Ale sam Resident nie posiada pola Node, wiec nie mozna
+		laczyc go w listy.
+		
+		Solution: Handler to amigowski struct Interrupt.
+		Zmienic nazwe, Interrupt jest bardziej adekwatna.
+		Wskaznik na funkcje, to wskaznik na funkcje Init modulu rezydentnego.
+		Handler to zwykly resident. Moze to byc okrojony device/library.
+		
+2003-03-01:
+
+	1.	Karygodny blad byl w pierwszym wywolaniu MakeFunctions() w exec_boot.c
+		esp nalezalo zwiekszyc o 24, bylo 0.
+	2.	Przerwania dzialaja. Utworzylem domyslny server, ktory obsluguje
+		poszczegolne przerwania (instrukcja switch).
+		Server mozna podmienic (czego raczej nie udostepnie),
+		funkcje dla poszczegolnych INT'ow beda przechowywane w listach.
+		W ten sposob bedzie mozna 'podpiac' wiele roznych funkcji pod
+		poszczegolne przerwania. Przewiduje mozliwosc blokowania
+		tej mozliwosci dla poszczegolnych przerwan
+		
+	3.	Niestety nie udalo mi sie dzis sprawic (a jest trzecia w nocy),
+		aby zadzialal handler klawiatury. Nie mam juz sil. Zwykla kopia
+		procedur ze starego jadra nie dala efektu.
+	
+	4.	Uwaga, robi sie balagan w kodzie poprzez wstawienie handlera
+		klawiatury. Powinien sie on znajdowac w oddzielnym module
+		"keyboard-handler"
+	
+	5.	Koncepcja:
+		Umiescic wszystkie moduly niezbedne do startu systemu i zarazem
+		najbardziej wrazlie w jednym pliku 'novakrnl'. Po prostu wykonac
+		join na poszczegolnych modulach. Wydzielic oddzielny segment
+		danych i kodu dla kernela i w ten sposob zabezpieczyc jadro.
+		I teraz powstanie problem z wywolywaniem funkcji z tych bibliotek.
+		Rozwiazania:
+			a.	kopiowac moduly do user_cs i user_ds. sprawdzac co jakis
+				czas sume kontrolna modulow i w przypadku wystapienia
+				jakiegos bledu ponownie kopiowac je z tego obszaru
+			b.	dla tych istotnych modulow systemu stworzyc inne
+				makra do wywolywania funkcji, tj. zastosowac call-gate'y
+		Przemyslec.
+		
+
+2003-02-26:
+	
+	1.	Mnostwo wody w Przemszy uplynie, zanim uda mi sie osiagnac cel.
+	2.	Udalo mi sie wywolac bezproblemowo funkcje z biblioteki exec na
+		dowolnym poziomie optymalizacji. Dlaczego sie nie ciesze? Nie wierze,
+		ze to wystarczy. Mam przeczucie, ze za niedlugo okaze sie, ze znow
+		cos nie gra. Na czym polegal problem?
+		
+		Bez optymalizacji wywolanie dzialalo (czasami :) dobrze.
+		Z optymalizacja na jakimkolwiek poziomie wszystko szlo w diably
+		(czyli triple fault). Koncepcji bylo kilka:
+		
+		a.	stos (nieprawidlowo	ustawiony po wyjsciu z procedury)
+		b.	blednie przekazane parametry (zwiazane rowniez ze stosem)
+		c.	"niewiedza" kompilatora, ze wywolanie makra wraz z wstawka
+			asemblerowa zawiera rozkaz call, ktory wywoluje procedure
+			modyfikujaca rejestry procesora.
+			
+		Odpowiedz: pkt.c okazal sie prawdziwy. Dzis rowniez skorygowalem
+		odpowiednio obsluge stosu. Okazalo sie bowiem, ze przy uzyciu
+		makra jako argumentu np. dla printf(), nastepne parametry nie byly
+		prawidlowo przekazywane wlasnie do tejze funkcji. Teraz wyglada, ze
+		wszystko jest w porzadku. Jednak nie wierze, bo to by bylo za proste.
+		A moze jednak? =)
+		
+		
+2003-02-06:
+
+	1. Wlasnie zauwazylem, ze moja koncepcja z przekazywaniem parametrow
+	funkcji jest zadziwiajaco podobna do metody zastosowanej w zrodlach
+	AROS'a :)) Przynajmniej patrzac na definicje makr. Ale ja nie zgapilem!
+	No moze jedynie pomysl samej definicji za pomoca makr...
+
+2003-02-05:
+	NIEMALZE MIESIAC PRZERWY NAD PRACAMI
+	
+	1.	Sesyja praktycznie zaliczona, jedynie 13.02. pozostal jeszcze
+		egzamin z PI (Podstaw Informatyki)
+	2.	Problem rejestrow intela z dn. 2003-01-10 wstrzymal prace nad os'em.
+		Jednakze nie tylko dlatego nic przez ten okres nie robilem.
+		Powod - patrz pkt. 1 =)
+	3.	Widze jakies rozwiazanie tego problemu:
+
+		a)	makra dla bibliotek (STUB)
+
+			-	przy deklaracji funkcji biblioteki
+			
+			LIB0 - bez parametrow (tzn. w rzeczywistosci jedynie *LibBase)
+			LIB1 - jeden param (in reality - 2 :)
+			LIB2 - ...
+			
+			-	po deklaracji zmiennych, ktore powinny miec wartosci
+				ustalone przez parametry
+				
+			GETPARAM0(zmienna0) - pobierz param. pierwszy
+			GETPARAM1(zmienna1) - pobierz param. drugi
+			...
+			
+			Przyklad:
+			
+			#define GP_START	__asm__ __volatile__ (
+			#define	GP_END(var) 	"movl %%eax,%0" : "=m" (var))
+			#define GETPARAM0(var)	GP_START	\
+									"movl 8(%%ebp),%%eax\n\t"	\
+									GP_END(var)
+		
+		b)	makra glowne, wykonujace w rzeczywistosci skok do pozycji w tabeli
+			wektorow:
+			
+			np. AllocMem(ULONG memsize, ULONG flags, struct *LibBase)
+			
+			ktore po poprostu wywoluja zrzucenie parametrow na stos
+			przez "push" oraz wykonuja nadmieniony wyzej skok.
+			na koniec przywracaja poprawna wartosc wskaznika stosu (esp).
+			
+			Przyklad:
+
+			#define AllocMem(_ms,_fl,_lb) \
+			({						\
+				ULONG ret;	\
+				__asm__ (	\
+						"pushl %3\n\t"	\
+						"pushl %2\n\t"	\
+						"pushl %1\n\t"	\
+						"call [pozycja w tabeli]\n\t"	\
+						"addl  $12,%%esp\n\t" \	(12, bo 4 bajty * 3 parametry = 12)
+						"movl %%eax,%0\n\t" \
+						: "=m" (ret)	\
+						: "m" (_ms), "m" (_fl), "m" (_lb));	\
+				(int) ret;		\
+			})
+
+			Oczywiscie makro to nalezy rozbic na kilka mniejszych, aby
+			tworzenie samych makr dla funkcji bibliotecznych bylo w miare
+			przyjemne.
+			
+		UWAGI:
+			
+			Pierwszy parametr przekazany do funkcji znajduje sie
+			na pozycji +8 wzgledem rejestru ESP. Wczesniej jest jeszcze
+			adres powrotu dla instrukcji RET, a zapisanego przez CALL.
+
+			Juz nie pamietam, ale jesli ESP wskazuje na wolne miejsce
+			na stosie, to pierwsza istotna dana (adres powrotu)
+			znajduje sie pod ESP+4.
+			
+		KONKLUZJA:
+		
+			Trik powyzszy bedzie dobry jednak dla pewnej, najlepiej
+			niewielkiej ilosci parametrow. Przeciez w ten sposob nie
+			otworzy sie okna z dziesatkami parametrow. Tu pozostaje taglista
+			i ewentualnie funkcje z biblioteki nova.lib dolaczanej przy
+			linkowaniu (ale to daleka sprawa, bo to dotyczy jeno kompilatora
+			pod NovaOS... nie ma sensu wczesniej budowac takiej biblioteki).
+			Jednakze PLUSEM OGROMNYM jest obejscie limitu rejestrow.
+			Przekazywanie parametrow przez stos nie powinno miec negatywnego
+			wplywu w srodowisku wielozadaniowym, gdyz kazda funkcja
+			biblioteki dzielonej w rzeczywistosci jest wykonywana jako
+			fragment kodu danego taska, a co za tym idzie - parametry
+			sa przekazywane poprzez indywidualne stosy.
+
+	4.	Jestem ogromnie rozczarowany programowaniem pod Wind*ws. Kazdy
+		element API jest oknem... nawet zwykly "baton"...
+		Nie mowie juz o "cudownych" builderach, dzieki ktorym tak prosto
+		mozna wczytac dbf'y, etc... :((
+		Czemu nie ma po prostu systemu datatype'ow???
+
+			
+2003-01-10:
+
+	1.	I POJAWIL SIE PROBLEM.
+		Wszystko byloby OK, gdyby parametry wywolywanych funkcji przekazywac
+		przez okreslone rejestry. Niestety iNTEL ma tych rejestrow zbyt
+		malo. Kompilator GCC uznaje tylko EAX,EDX,ECX do przekazywania
+		parametrow - reszta przez stos. Klopot wystepuje w przypadkach, gdy:
+	
+		a.	trzeba przekazac wiecej niz trzy parametry
+		b.	przejdziemy na rozwiazanie polegajace na przekazywaniu
+			parametrow przez stos i kompilator optymalizujac kod,
+			nie bedzie "wiedzial", ze podczas wykonania kodu __asm__
+			(definicje funkcji bibliotek) zostana zmodyfikowane niektore
+			rejestry. I tak moga powstac forever-loops.
+		
+		KONCEPCJA:
+		EAX - wskaznik na baze biblioteki
+		EDX - param / *taglista
+		ECX - param / *taglista
+		
+		Zalety:	pieprzyc przekazywanie parametrow przez stos do bezposredniego
+				wywolania funkcji systemowej
+		Wady:	tworzenie taglisty nawet do MakeFunctions()...?
+		
+		WYJSCIE:
+				dolaczyc biblioteke (np. execlib.a) podczas kompilacji,
+				zawierajaca zdefiniowane funkcje biblioteki, do ktorych
+				parametry przekazuje sie przez stos (jak normalnie w C),
+				i ktore beda tworzyly na tej podstawie taglisty i wywolywaly
+				odpowiednie funkcje biblioteki.
+
+				WADY:	Slooow doooown of myyyy syyysssttteeeemmmmm....
+						Not very much, but there is... :(
+				
+
+		KONCEPCJA #2:
+		
+		Mozna definiowac specyficzne atrybuty dla kompilera, tj. ilosc
+		i kolejnosc rejestrow przy wywolywaniu funkcji, itp.
+		Moze to cos da?
+		
+		KONCEPCJA #3:
+		
+		makro 'STUB' - definicja naglowka funkcji
+
+
+2003-01-07:
+
+	1.	AllocMem(), FreeMem() zmodyfikowac dodajac do nich dopisywanie
+		utworzonego MemHeader'a do listy zaalokowanej pamieci przez
+		danego task'a (tc_MemList). Dla bezpieczenstwa przed uszkodzeniem
+		tej listy moznaby:
+
+		a)	wprowadzic kopie MemList'y aktualnego taska do SysBase.
+		b)	wprowadzic do SysBase zmienne okreslajace ilosc wezlow
+			tc_MemList oraz sumaryczna ilosc zajmowanej pamieci przez
+			aktualnego task'a (tcMemListNodes, tcMemSizeSum)
+		c)	dla zwiekszenia bezpieczenstwa punkt b) rozwinac na wszystkie
+			taski i sprawdzac za kazdym razem, czy wartosci te nie sa rozne.
+		d)	aby przyspieszyc wykonywane punktu c) wprowadzic sume kontrolna,
+			ktora obliczac bedzie AllocMem() i FreeMem()
+			
+
+2003-01-04:
+	
+	1.	Zastanawiam sie, czy nie wrzucic makr dot. list (tj. NewList,
+		GetHead, etc..) do exec'a. Moze sam exec i aplikacje beda
+		nieco mniejsze? Co utrace przez te operacje? Dlaczego tworcy
+		AmigaOS'u zdefiniowali je jako makra? Czyzby przez ograniczona
+		pojemnosc ROM'u?
+
+	2.	Problem modulow startowych rozwiazany. Skoro wszystko jest
+		modulami rezydentnymi, to radze juz na poczatku zaladowac
+		jakis root-filesystem, floppy.device, harddisk.device i...
+		to wszystko powinno wystarczyc do odpalenia systemu. Te moduly
+		moga, ale nie musza zostac w pamieci! Do dupy!
+		Po co je usuwac z pamieci? W zaleznosci od zastosowanego
+		filesystemu na partycji bootujacej, bedzie na nosniku 
+		nagrany odpowiedni bootstrap oraz novacore specjalny dla
+		tego filesystemu. Idac dalej - mozna dolaczyc obsluge
+		wielu najczesciej stosowanych filesystemow do novacore!
+		Na podstawie uzytego filesystemu, novacore okreslaloby
+		jaki modul zaladowac na starcie.
+		
+		WARUNEK #1: MBR (bootstrap) nie moze czytac z FAT lub innego
+		z gory zdefiniowanego filesystemu.
+
+		ERRATA #1: Dla kazdego filesystemu (po formatowaniu przez
+		NOVA-OS) bedzie nagrywany MBR (bootstrap) z obsluga
+		konkretnego FS'a.
+
+		WARUNEK #2: obsluga kazdego FS nie moze przekroczyc 512 bajtow
+		(w rzeczywistoci nieco mniej). Jesli sie nie zmiesci, to "dupa
+		zbita, Kiler".
+
+		ERRATA #2: zastosowac MBR czytajacy rawsectors i novacore
+		nagrane w sposob okreslony ponizej (czyt. UWAGA)
+			
+		UWAGA: jesli mialbym kilka wolnych sektorow na partycji
+		zarezerwowanych dla systemu, moglbym tam umiescic novacore
+		na stale, co byloby rozsadniejsze dla usera (nie moglby tego
+		tak prosto skasowac :)
+	
+	3.	Problem ladowania residentow na starcie jest problemem,
+		gdy maja byc one skompilowane z konkretnym origin'em i
+		wczytane pod konktretne miejsce pamieci. Skoro novacore
+		ma byc wiekszy (obsluga innych filesystemow) to moze
+		dopisac tam modul relokacji?
+	
+	4.	Novacore moglby byc malutki, a obsluge filesystemu
+		moznaby oddac jakiemus modulowi zewnetrznemu zaladowanego
+		wraz z exec. Nalezaloby jednak napisac obsluge IDE i floppy
+		dla trybu chronionego. Pytanie - czy problem 1024 cylindra
+		zniknie? Raczej nie, bo bootstrap (czy tez MBR) korzysta
+		z int13h.
+		
+		Koncepcja: sprawdzic, czy nowe BIOS'y oferuja podobna funkcje,
+		aczkolwiek pozbawiona wad int13h.
+		
+	NEWS:
+
+	1.	Nie jestem pewien co do wykonywania kodu bibliotek. Czy to napewno
+		bedzie wykonywane jako czesc tasku? Moze trzeba bedzie zastosowac
+		przerwanie (SYSCALL), jednakze dla mnie poniekad jest to jeszcze
+		nie do konca jasne.
+	
+	2.	Mozliwe jest zdefiniowanie prototypu funkcji na zasadzie #define,
+		i tak tez beda przygotowane protos dla usera oraz wszystkich
+		modulow, programow, jednak za wyjatkiem exec'a. Exec zna adresy
+		swoich funkcji. Poza tym podejrzewam, ze bedzie to furtka dla
+		ewentualnego zabezpieczenia exec'a. Z powyzszego wynika, ze dla
+		exec'a nie mozna ladowac <proto/exec.h>, jedynie wewnetrzne
+		definicje funkcji z innego pliku, najlepiej "exec_funcs.h".
+		
+	3.	Lekka zmiana koncepji ladowania resident'ow. Dotyczy tez exec'a.
+		Po zapoznaniu sie z funkcja AmigaOS InitResident() oraz
+		MakeLibrary() i pochodnych stwierdzam, iz trzeba tuz przed
+		funkcja init() (dla exec'a exec_boot() lub zmiana nazwy) umiescic
+		mala tablice wskaznikow do: tabeli wektorow funkci, adresu funkcji
+		init(), wielkosci tabeli wektorow
+		
+		InitResident() dodaje moduly z listy ResModules zawierajace flage
+		RTF_AUTOINIT do odpowiednich list (LibraryList, DeviceList, etc...).
+		Jesli flaga ta nie jest ustawiona to moduly same powiny dodac sie
+		do tych list. InitResident() wykonuje init() danego modulu. init()
+		zwraca adres bazy modulu.
+		
+		Koncepcja #1:
+		
+		NOVACORE: zaimplementowac fragment InitResident() dot. odpowiedniej
+		analizy struktury Init.
+
+		exec.library nie bedzie miec ustawionej flagi RTF_AUTOINIT.
+		
+		Uwagi: tabela wektorow funkcji dla exec'a musi byc juz prawidlowo
+		przygotowana.
+		
+		
+		Koncepcja #2:
+		
+		NOVACORE: wywoluje exec_strap (exec_boot). Adres exec_strap() moze
+		zostac przekazany w strukturze ExtendedResident (poczatek identyczny
+		jak Resident ze wzgledow kompatybilnosci) wpisanej w exec.lib zamiast
+		Resident. exec_strap() wywoluje InitResident() dla samej exec.library.
+		
+
+2003-01-03:
+
+Odkryto:
+
+	1.	Kod funkcji biblioteki bedzie wykonywany jako kod wywolujacego go
+		task'a. Co za tym idzie, np. FindTask(NULL) w funkcji biblioteki
+		zwroci wskaznik na strukture Task aktualnego zadania! (EUREKA :)
+		
+		Zastosowac do: 
+		-	AllocMem():
+			Zarezerwowany blok trzeba dopisac do listy pamieci danego tasku
+		-	FreeMem():
+			j.w. ale chodzi o usuniecie go z listy
+	
+	2.	Z pkt.1 wynika, ze funkcja boot() z dos.library musi byc taskiem.
+	3.	Sprawa wywolywania funkcji bibliotek:
+		prawdopodobnie istnieje mozliwosc uzycia #define. Nalezy zaglebic
+		sie dokladnie w kod generowany przez C.
+
+	4.	novacore:	zmienic skok do exec'a. Nie mozna korzystac z entry_point
+					wskazywanego przez ELF'a, poniewaz bedzie to funkcja
+					zwracajaca (-1). exec.library bedzie zapisany jako zwykly
+					plik  (biblioteka), wiec chyba nie chcemy, aby podczas
+					"dwukliku" na jej nazwie poszedl j*bac sie system :)
+					Entry point nalezy odczytac ze struktury Resident.
+					W novacore nalezy napisac funkcje szukajaca struktury
+					Resident, tj. ciagu RESIDENT_MAGIC oraz sprawdzic kolejne
+					dlugie slowo czy rowne jest adresowi tej struktury.
+					Jesli tak, odczytac pole Init (czy jakos tak) i pod ten
+					odczytany adres sie udac.
+					
+Uwagi:
+
+	1.	Jesli dalej bedziemy trzymac sie objetej konwencji, system bedzie
+		podatny na zaklocenia. User bedzie mogl jezdzic po pamieci swobodnie,
+		co moze w przypadku nie przestrzegania wytycznych doprowadzic do
+		kataklizmu systemu.
+		
+		W obecnym stadium wiedzy nie jestem w stanie okreslic realnego
+		rozwiazania tego problemu, przy zachowaniu dotychczasowych zalozen
+		odnosnie zasady dzialania zasobow systemu.
+		
+
+2003-01-02:
+
+Nowosci w nowym roku:
+
+	-	exec.library laduje sie pod staly adres 0x80000.
+	-	Baza KERNEL_CS i KERNEL_DS jest ustawiona na 0, czyli
+		w praktyce to samo, co LINEAR_CS/DS.
+	-	novacore wczytuje exec pod adres tymczasowy ADDR_TEMPBUF,
+		sprawdza offset sekcji .text i kopiuje kod+dane w odpowiednie
+		miejsce.
+	-	zaleta tego rozwiazania jest brak mordowania sie ze zmiennymi
+		virt_to_phys itp. Uwazam, ze w takim modelu pamieci i tak by
+		nic nie dalo chronienie bibliotek. Mozna sobie ochronic co najwyzej
+		core, ale na co to komu. Exec i tak zezre pamiec zajeta przez core.
+		Biblioteki i tak beda ladowane do pamieci user'a, poniewaz ma byc
+		do nich szybki dostep
+	-	trzeba napisac makra do generowania kodu bibliotek. Chodzi o tworzenie
+		(i wypelnienie) struktur Resident, Library (ExecBase/DosBase etc) oraz
+		tabeli funkcji.
+		
+		Koncepcja #1:
+		
+			Tabele funkcji wraz ze struktura Library zapisac w oddzielnej
+			sekcji ELF'a (np. ".data.libbase"). Struktura Resident moze
+			byc gdziekolwiek. Zawierac bedzie m.in. wskaznik do funkcji init().
+			Funkcja init() bedzie przygotowywac biblioteke do pracy (wywolywana
+			tylko raz przez OpenLibrary() tylko przy wczytywaniu). Nastepnie
+			OpenLibrary() wywola open() danej biblioteki i zwroci adres
+			jej bazy. Biblioteka musi miec ustalony entry_point na funkcje
+			zwracajaca (-1) w przypadku proby uruchomienia jej bezposrednio.
+			Biblioteka ma byc relokowana, jak kazdy plik wykonywalny w systemie.
+			
+		Koncepcja #2:
+		
+			Tabele funkcji i strukture Library umiescic w sekcji ".text"
+			na poczatku pliku. Ale czy to cos zmieni? Tak. Struktura Library
+			zawiera pola NegSize i PosSize. NegSize - ilosc bajtow przed
+			baza biblioteki, czyli wielkosc tablicy funkcji, a dzielac to przez 6
+			da ilosc funkcji biblioteki. PosSize - wielkosc biblioteki wraz
+			ze struktura Library. Poza tym reszta z Koncepcji #1.
+
+		Koncepcja #3:
+		
+			Ladowac, relokowac.	Ladowac w odpowiednie miejsca, kolejno:
+			struktury, kod, dane. Jest sens? Tym bardziej ze dos.library
+			i byc moze kilka innych plikow (jak np. filesystem) musi
+			byc zaladowanych bez relokacji, bo ja sie nie bede ciapcial
+			w asemblerze intela z rozkladaniem ELF'a na czesci...
+			
+	-	jak juz wspomnialem, przechodzimy na relokacje plikow.
+	-	PROBLEM: napisac jakies definicje, aby mozna bylo w C wywolywac
+		funkcje "normalnie", tj. np. AllocMem(bla,bla), ale zeby kompilator
+		w rzeczywistosci:
+		
+			a)	generowal kod wywolujacy procedure z tablicy funkcji danej
+				biblioteki, np: (pseudo asm)
+				
+					mov	esi,ExecBase
+					mov	eax,param#1
+					mov	edx,param#2
+					call [esi+offset] ; ewentualny wynik zwracany w eax
+			
+			b)	umozliwial wpisanie do zmiennej wyniku, czyli jakis myk
+				umozliwiajacy po powyzszym zapisanie (np):
+				
+					mov	[esp-8], eax
+					
+				Gdzie wywolanie w C wygladaloby po prostu tak:
+				
+					addr = AllocMem(0x1000,MEMF_CLEAR);
+					
+		Exec moze wywolywac swoje funkcje bez takich problemow, ale
+		dos.library musi juz potrafic te cuda.
+
+	-	dobry pomysl jest ze stworzeniem listy ladowanych przez core
+		plikow i ich adresow, oraz przekazaniem jej przez stos do
+		_startup() exec'a. Wyeliminuje sie ciagle modyfikacje plikow
+		memory.h (exec) i memorymap.i (core). Chodzi o wywolanie
+		AllocAbs() na obszarach wykorzystywanych przez zaladowane
+		pliki.
+		
+
+2002-12-30:
+
+1. mapa pamieci gotowa
+2. exec/dos - rozwiazanie z przypisaniem stalego miejsca w pamieci
+3. ladowanie plikow w rozne miejsca pamieci, relokacja
+4. user/kernel descriptors - identyczne (baza,limit)
+   maja sluzyc tylko do roznic w privilege levels
+5. 'novacore' nie mozna przepisac w C. Probowac z linkowaniem kodu 16bit/32bit,
+   przeczytac MANUAL do 'ld' pod tym katem.
+6. jesli nie da sie wykonac tego co w pkt. 5, to przezucic czesc roboty
+   planowanej dla 'novacore' na exec.library/init().
+
+
+2002-12-23:
+
+1. nazwe "novaload" zmienic na "core" lub "novacore" (kosmetyczna poprawka)
+2. "core" funkcje:
+   - wypelnic ExecBase
+   - uzupelnic liste modulow rezydentnych, bibliotek, urzadzen, etc...
+   - dodac kprintf(), alert() (kopia z Exec), obsluge trybu textowego
+   - przepisac w C, zmiksowac kod 16bit (przed PMODE) z 32bit (PMODE)
+   - ladowac dos.library i exec.library
+   - ustalic GDT, IDT, przeroutowac przerwania
+   - stworzyc intgate SysCall
+   - opracowac mape pamieci
+   - stworzyc liste wolnej pamieci
+   - zarezerwowac (AllocAbs()) pamiec dla core, exec, dos
+3. SysBase = ExecBase
+4. kazda biblioteka/device/etc.. jest modulem rezydentnym
+5. AROS: SupervisorMode tylko podczas wykonywania core, pozniej przejscie
+   do UserMode (czyzby bardzo slaby model ochrony pamieci?)
+   Zastanowic sie nad problemem - czy moduly rez bedac w KERNEL_CS beda
+   tak samo latwo dostepne jak libs/devs w AmigaOS?
+6. Jak dziala dokladnie SysCall?
+7. Co zwraca OpenLibrary?
+   Moze adres bazy biblioteki w KERNEL_CS? Wtedy SysCall przy parametrze mialby
+   podawany ten adres i offset do tabeli funkcji? SysCall uzylby mocy w KERNEL_CS?
+   
+2002-12-17:
+
+1. dos.library i exec.library skompilowac z gory ustalonym EntryPoint.
+   Nie trzeba bedzie sie bawic w relokacje, a zabawa w "piecdziesiat"
+   roznych deskryptorow nie wchodzi w rachube. Chyba ze biblioteki nie
+   beda posiadaly wlasnych danych, co raczej jest niemozliwe.
+   Biblioteki te ladowac bedzie loader ("novaload.c")
+ 
+2. dos.library bedzie posiadala funkcje boot() majaca za zadanie:
+	- otworzyc biblioteki niezbedne do dalszej pracy systemu
+	  (np. intuition, graphics)
+	- stworzyc przypisania: SYS, C, S, L, LIBS, DEVS, ENVARC, etc...
+	- zamontowac device CON:
+	- zaladowac con-handler
+	- zaladowac shell, przekazac prawdopodobnie przez msg-port
+	  wiadomosc o wykonaniu skryptu S:Startup-Sequence
+	- usnac.
+	
+3. Struktura i zawartosc podstawowego katalogu systemowego:
+
+	SYS
+	+--- C/		(glowne rozkazy shell'a, o innych na razie nie mysle ;)
+	|    + Avail		(ilosc wolnej/zajetej pamieci)
+	|    + Dir		(wyswietlanie zaw. katalogu)
+	|    + Makedir  	(stworzenie katalogu)
+	|    + Delete   	(usuwanie plikow/katalogoww)
+	|    + Rename		(zmiana nazwy plikow/katalogow)
+	|    + Execute		(wykonanie skryptu)
+	|    + Run		(uruchomienie programu jako oddzielny proces)
+	|    + Wait		(Oczekiwanie przez n/100 sekund)
+	|    + Ed		(edytor tekstu ASCII)
+	|    + Copy		(kopiuj pliki/katalogi)
+	|    + Mount		(montowanie urzadzen)
+	+--- Devs/	(sterowniki urzadzen)
+	|    +--- SoundCards/	(Sterowniki kart dzwiekowych dla sound.device)
+	|    |	    +--- Creative/
+	|    |	    |     + SB Live
+	|    |      |     + SB 128 PCI
+	=    =      =     = (...etc...)
+	
+	|    +--- GfxBoards/	(Sterowniki kart graficznych dla vga.device)
+	|    |      +--- nVidia/
+	|    |      |     + Riva TNT2 M64 32MB
+	=    =      =     =     (... etc ...)
+	
+	|    +--- Keyboards/	(Sterowniki klawiatur)
+	|    +--- Mouses	(Sterowniki mysz)
+	|
+	|    + clipboard.device	(schowek)
+	|    + floppy.device	(obsluga st. dyskietek)
+	|    + harddisk.device	(obsluga dyskow twardych)
+	|    + cdrom.device	(obsluga stacji CD)
+	|    + cdrec.device	(obsluga stacji CDRW)
+	|    + sound.device	(sterownik kart dzwiekowych)
+	|    + vga.device	(sterownik kart graficznych)
+	|    + input.device	(komunikacja z uzytkownikiem: klawiatura/mysz)
+	|    + pci.device	(sprawdzanie, czy nie ma nowych urzadzen, szukanie sterownikow etc)
+	|
+	+--- Libs/
+	|	+ dos.library
+	|	+ exec.library
+	|	+ intuition.library
+	|	+ sound.library		(funkcje dzwiekowe)
+	|	+ graphics.library	(funkcje graficzne, w tym 3D - cos jak RTG)
+	'
+
+

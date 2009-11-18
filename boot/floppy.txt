@@ -1,0 +1,18 @@
+20-12-2002
+==========
+
+Uwagi:
+
+1. Do instalowania MBR na dyskietke FAT12 nalezy napisac
+   odpowiedni program. Nie mozna bowiem zastapic
+   informacji zawartych na poczatku MBR jakimis wlasnymi.
+   Byc moze ktos utraci jakies wazne dane.
+   
+   Program powinien:
+    - odczytac MBR z dyskietki
+    - zmodyfikowac kod tuz za naglowkiem
+    
+2. Dopisac obsluge dlugich nazw albo co, bo glupio wyglada wpis
+   libs/dos.lib (jak w DOS lub Winblows). Ma byc dos.library i kuniec.
+   
+3. FAT12 powinien zostac ze wzgledu na jego obsluge przez inne systemy.

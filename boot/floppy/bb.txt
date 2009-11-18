@@ -1,0 +1,375 @@
+%line 2+1 mbr.asm
+
+%line 1+1 boot/boot.i
+
+GFX_MODE	equ	0x03
+TABLICA_ZNAKOW	equ	0x02
+MATRYCA		equ	0x01
+
+INT13_READBUFFER_SEG	equ	0x0
+INT13_READBUFFER_OFFS	equ	0x2000
+INT13_FATBUFFER		equ	0x6000
+
+
+
+
+
+
+
+[absolute 0]
+%line 16+0 boot/boot.i
+Elf32_Ehdr:
+%line 17+1 boot/boot.i
+	.e_ident	resb	16
+	.e_type		resb	2
+	.e_machine	resb	2
+	.e_version	resb	4
+	.e_entry	resb	4
+	.e_phoff	resb	4
+	.e_shoff	resb	4
+	.e_flags	resb	4
+	.e_ehsize	resb	2
+	.e_phentsize	resb	2
+	.e_phnum	resb	2
+	.e_shentsize	resb	2
+	.e_shnum	resb	2
+	.e_shstrndx	resb	2
+Elf32_Ehdr_size:
+%line 31+0 boot/boot.i
+[section .text]
+%line 32+1 boot/boot.i
+
+[absolute 0]
+%line 33+0 boot/boot.i
+Elf32_Phdr:
+%line 34+1 boot/boot.i
+	.p_type		resb	4
+	.p_offset	resb	4
+	.p_vaddr	resb	4
+	.p_paddr	resb	4
+	.p_filesz	resb	4
+	.p_memsz	resb	4
+	.p_flags	resb	4
+	.p_align	resb	4
+Elf32_Phdr_size:
+%line 42+0 boot/boot.i
+[section .text]
+%line 43+1 boot/boot.i
+
+%line 46+1 boot/boot.i
+
+
+%line 1+1 core/memorymap.i
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%line 27+1 core/memorymap.i
+
+
+%line 38+1 core/memorymap.i
+
+%line 42+1 core/memorymap.i
+
+%line 45+1 core/memorymap.i
+
+
+
+
+
+%line 52+1 core/memorymap.i
+BOOTDRIVE_PTR	EQU		(0x1000 + 0x4)
+
+%line 5+1 mbr.asm
+
+[org 0x7C00]
+[bits 16]
+
+
+
+
+
+	jmp 	short	start
+	nop
+
+		db	'IBM',0,0,'4.0'
+bytes_per_sec:	dw	512
+sec_per_block:	db	1
+sec_reserved:	dw	1
+fat_copies:	db	2
+root_size:	dw	0xE0
+sec_all:	dw	0x0B40
+disk_id:	db	0xF0
+fat_size:	dw	9
+sec_per_track:	dw	0x12
+heads:		dw	2
+sec_hidden:	dd	0
+sec_all_huge:	dd	0
+drive_num	db	0
+reserved	db	0
+signature	db	0x29
+volume_id	dd	0x5a541826
+volume_label	db	'NOVA OS    '
+filesystem_id	db	'FAT12   '
+
+
+
+
+
+%line 45+1 mbr.asm
+
+
+
+
+
+start:	jmp	0:start2
+start2:	mov	[boot_device],dl
+	xor	ax,ax
+	mov	ds,ax
+	mov	es,ax
+	cli
+
+	mov	ax,BOOTDRIVE_PTR
+	mov	[ax],dl
+	mov	ax,0
+	mov	ss,ax
+	mov	sp,0xFFF
+	sti
+	cld
+
+	mov	bl,7
+%line 65+0 mbr.asm
+	mov	si,m_welcome
+	call	write
+%line 66+1 mbr.asm
+
+
+	xor	ah,ah
+	int	0x13
+
+
+	movzx	ax,byte [fat_copies]
+	mul	word [fat_size]
+	add	ax,[sec_reserved]
+	mov	[root_dir_sec],ax
+
+	mov	ax,[root_size]
+	shl	ax,5
+	div	word [bytes_per_sec]
+	mov	[root_sectors],ax
+
+	add	ax,[root_dir_sec]
+	mov	[data_start],ax
+
+ 	movzx	eax, word [sec_reserved]
+	mov	bx,INT13_FATBUFFER
+	mov	di,word [fat_size]
+	call	read_sector
+
+
+
+	movzx	eax,word [root_dir_sec]
+	mov	[logical_sector],eax
+	mov	cx,[root_sectors]
+
+readroot:
+	mov	bx,INT13_READBUFFER_OFFS
+	mov	eax,[logical_sector]
+	mov	di,1
+	call	read_sector
+	jc	near error
+	push	cx
+	mov	bx,INT13_READBUFFER_OFFS
+	mov	cx,[bytes_per_sec]
+	shl	cx,5
+
+.searchfile:
+	push	cx
+	mov	si,bx
+	mov	di,loaderfile
+	mov	cx,11
+	repz	cmpsb
+	jz	.found
+	add	bx,0x20
+	pop	cx
+	loop	.searchfile
+
+	pop	cx
+	add	dword [logical_sector],1
+	loop	readroot
+	mov	bl,7
+%line 121+0 mbr.asm
+	mov	si,m_nima
+	call	write
+%line 122+1 mbr.asm
+	mov	bl,7
+%line 122+0 mbr.asm
+	mov	si,loaderfile
+	call	write
+%line 123+1 mbr.asm
+	jmp	$
+
+.found:
+	mov	ax,[bx+0x1A]
+	mov	bx,0x1200
+
+readfile:
+
+	cmp	ax,0x0FEF
+	jae	.endfile
+	push	bx
+	mov	bx,ax
+	shl	bx,1
+	add	bx,ax
+	shr	bx,1
+	add	bx,INT13_FATBUFFER
+	mov	dx,[bx]
+	test	ax,1
+	jnz	.shift
+	and	dx,0x0FFF
+	jmp	.read
+
+.shift:	shr	dx,4
+.read:	mov	[next_cluster],dx
+	sub	ax,2
+	movzx	dx,byte [sec_per_block]
+	mul	dx
+	add	ax,[data_start]
+	pop	bx
+	push	bx
+	mov	di,1
+	call	read_sector
+	jc	error
+	pop	bx
+	add	bx,word [bytes_per_sec]
+	mov	ax,[next_cluster]
+	jmp	short readfile
+
+.endfile:
+	jmp	0x1200
+
+error:	
+%line 164+0 mbr.asm
+	mov	bl,7
+	mov	si,m_error
+	call	write
+%line 165+1 mbr.asm
+end:	jmp	short $
+
+
+
+
+
+
+
+
+read_sector:
+	push	dx
+	push	cx
+
+	xor	dx,dx
+	div	word [sec_per_track]
+	inc	dl
+	mov	[sector],dl
+	xor	dx,dx
+	div	word [heads]
+	mov	[track],ax
+	mov	[head],dl
+	mov	cx,0x5
+.tryagain:
+	push	cx
+	xor	ch,ch
+	mov	cl,[sector]
+	mov	ax,[track]
+	xchg	ah,al
+	ror	al,2
+	or	cx,ax
+	mov	ax,di
+	mov	ah,2
+	mov	dl,[boot_device]
+	mov	dh,[head]
+	int	0x13
+	jnc	.ok
+	pop	cx
+	loop	.tryagain
+	jmp	.end
+.ok	pop	cx
+.end	pop	cx
+	pop	dx
+	ret
+
+
+
+
+
+
+
+
+
+
+
+write:
+	push	ax
+.l	lodsb
+        cmp	al,0
+	jz	.ew
+        mov	ah,0Eh
+        int	10h
+	jmp	.l
+.ew:	pop	ax
+	ret
+
+
+
+
+
+boot_device	db	0
+root_dir_sec	dw 	0
+root_sectors	dw	0
+logical_sector	dd	0
+head		db	0
+track		dw	0
+next_cluster	dw	0
+sector		db	0
+data_start	dw	0
+
+
+
+
+
+loaderfile	db	'NOVACORE   ',0
+
+
+
+
+
+m_welcome	db	13,10,'[NOVA-OS]',13,10,0
+m_nima		db	'File not found: ',0
+m_error		db	'Error',0
+
+
+
+
+	times	510-($-$$) db 0
+	dw	0xAA55
+
