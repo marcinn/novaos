@@ -18,7 +18,8 @@ DESTDIR = $(NOVADIR)/obj/libs
 INCDIR = $(NOVADIR)/include
 STDLIB = $(NOVADIR)/clib/std.lib $(NOVADIR)/clib/sys/stdport.lib
 GCC = gcc
-CFLAGS = -nostdinc -nostdlib -I $(INCDIR) -O3 -s -fno-ident -fvolatile -fno-default-inline $(DEFINES)
+#CFLAGS = -nostdinc -nostdlib -I $(INCDIR) -O3 -s -fno-ident -fvolatile -fno-default-inline $(DEFINES)
+CFLAGS = -nostdinc -nostdlib -I $(INCDIR) -O3 -s -fno-ident -fno-default-inline $(DEFINES)
 LFLAGS = -dN -Ttext 0x80000 -s
 
 exec.library:

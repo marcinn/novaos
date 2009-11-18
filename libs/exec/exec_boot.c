@@ -15,7 +15,7 @@
 #include "exec_init.h"
 
 const __TEXT ULONG LIBSTART=1;		/* very very first byte of .text section */
-// const __TEXT struct ExecBase LibBase={};
+const __TEXT struct ExecBase LibBase={};
 
 
 struct ExecBase *SysBase, *ExecBase;

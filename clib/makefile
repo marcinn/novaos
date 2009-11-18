@@ -3,7 +3,8 @@ NOVADIR = $(TOP)
 DESTDIR = $(NOVADIR)/clib
 INCDIR = $(NOVADIR)/include
 GCC = gcc
-CFLAGS = -c -nostdinc -nostdlib -I $(INCDIR) -O3 -s -fno-ident -fvolatile
+#CFLAGS = -c -nostdinc -nostdlib -I $(INCDIR) -O3 -s -fno-ident -fvolatile
+CFLAGS = -c -nostdinc -nostdlib -I $(INCDIR) -O3 -s -fno-ident
 LFLAGS = -dN -s -r
 
 .PHONY:	std.lib

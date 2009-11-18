@@ -82,7 +82,7 @@ struct MemHeader
 
 /* Avail */
 
-#define	MEMF_LARGEST	(1<<6)
+/* #define	MEMF_LARGEST	(1<<6) */
 
 
 #define	MEM_BLOCKSIZE	8L
